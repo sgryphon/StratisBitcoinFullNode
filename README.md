@@ -28,6 +28,13 @@ The daemon is a full implementation of the Stratis Bitcoin Full Node, with the f
 NOTE: Some of these are in the NBitcoin project.
 
 
+Development requirements
+------------------------
+
+* Visual Studio
+* Microsoft .NET Core Tools
+
+
 Getting started
 ---------------
 
@@ -37,7 +44,16 @@ Getting started
 
 3. Build, and check the tests pass
 
-4. You can also check the node at least runs
+4. You can also check the node at least runs.
+
+   To see console output when running from Visual Studio, 
+   set the Debug > Application Arguments to something like:
+
+        -testnet -printtoconsole -debug=1
+
+   The datadir will default to somewhere like:
+
+        C:\Users\<user>\AppData\Roaming\stratisbitcoin\
 
 5. Publish the Stratis.BitcoinD project
 
@@ -49,7 +65,7 @@ Getting started
 
 8. Run the node, e.g. on testnet:
 
-   dotnet .\Stratis.BitcoinD.dll -testnet -datadir=C:\StratisBitcoinData
+        dotnet .\Stratis.BitcoinD.dll -testnet -datadir=C:\StratisBitcoinData
 
    (Note it may take a while to discover peers.)
 
@@ -65,8 +81,8 @@ Enabling RPC
 
 3. Also add the following two values (use a proper password for a production system):
 
-   rpcuser=bitcoinrpc
-   rpcpassword=testnetpassword
+        rpcuser=bitcoinrpc
+        rpcpassword=testnetpassword
 
 4. Restart the node
 
@@ -76,5 +92,5 @@ Enabling RPC
 
 6. Use it to test the server is working:
 
-   .\bitcoin-cli.exe -testnet -rpcuser=bitcoinrpc -rpcpassword=testnetpassword getblockhash
+        .\bitcoin-cli.exe -testnet -rpcuser=bitcoinrpc -rpcpassword=testnetpassword getblockhash
 
