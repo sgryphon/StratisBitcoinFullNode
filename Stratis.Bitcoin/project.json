@@ -16,7 +16,9 @@
     "Microsoft.Extensions.Logging.Filter": "1.1.0",
     "NBitcoin": "3.0.2.4",
     "System.Xml.XmlSerializer": "4.3.0",
-    "Microsoft.Extensions.Logging.Debug": "1.0.0"
+    "Microsoft.Extensions.Logging.Debug": "1.0.0",
+    "Microsoft.Extensions.Logging.TraceSource": "1.0.0",
+    "System.Diagnostics.TextWriterTraceListener": "4.3.0"
   },
 
   "frameworks": {

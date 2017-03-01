@@ -15,10 +15,12 @@ namespace Stratis.BitcoinD
 	{
 		public static void Main(string[] args)
 		{
-			var loggerFactory = Logs.GetLoggerFactory(args);
+			NodeArgs initialNodeArgs = NodeArgs.GetInitialArgs(args);
+
+			var loggerFactory = Logs.GetLoggerFactory(initialNodeArgs);
 			Logs.Configure(loggerFactory);
 
-			NodeArgs nodeArgs = NodeArgs.GetArgs(args);
+			NodeArgs nodeArgs = NodeArgs.GetRemainingArgs(args, initialNodeArgs);
 			FullNode node = new FullNode(nodeArgs);
 			CancellationTokenSource cts = new CancellationTokenSource();
 			new Thread(() =>

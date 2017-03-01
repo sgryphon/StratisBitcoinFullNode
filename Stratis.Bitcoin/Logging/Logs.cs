@@ -3,6 +3,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Diagnostics;
+using System.IO;
+using Stratis.Bitcoin.Configuration;
 
 namespace Stratis.Bitcoin.Logging
 {
@@ -23,16 +26,8 @@ namespace Stratis.Bitcoin.Logging
 			EstimateFee = factory.CreateLogger("Stratis.Bitcoin.Fee");
 		}
 
-		public static ILoggerFactory GetLoggerFactory(string[] args)
+		public static ILoggerFactory GetLoggerFactory(NodeArgs initialNodeArgs)
 		{
-			// TODO: preload enough args for -conf= or -datadir= to get debug args from there
-
-			//Configuration = factory.CreateLogger("Configuration");
-			//FullNode = factory.CreateLogger("FullNode");
-			//ConnectionManager = factory.CreateLogger("ConnectionManager");
-			//EstimateFee = factory.CreateLogger("EstimateFee");
-
-			var debugArgs = args.Where(a => a.StartsWith("-debug=")).Select(a => a.Substring("-debug=".Length).Replace("\"", "")).FirstOrDefault();
 			var keyToCategory = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
 				{
 					//{ "addrman", "" },
@@ -69,9 +64,9 @@ namespace Stratis.Bitcoin.Logging
 			//Disable aspnet core logs
 			filterSettings.Add("Microsoft.AspNetCore", LogLevel.Error);
 
-			if (!string.IsNullOrWhiteSpace(debugArgs))
+			if (!string.IsNullOrWhiteSpace(initialNodeArgs.Debug))
 			{
-				if (debugArgs.Trim() == "1")
+				if (initialNodeArgs.Debug.Trim() == "1")
 				{
 					// Increase all logging to Trace
 					filterSettings.Add("Stratis.Bitcoin", LogLevel.Trace);
@@ -79,7 +74,7 @@ namespace Stratis.Bitcoin.Logging
 				else
 				{
 					// Increase selected categories to Trace
-					var categoryKeys = debugArgs.Split(',');
+					var categoryKeys = initialNodeArgs.Debug.Split(',');
 					foreach (var key in categoryKeys)
 					{
 						string category;
@@ -98,12 +93,24 @@ namespace Stratis.Bitcoin.Logging
 
 			// TODO: Additional args
 			//var logipsArgs = args.Where(a => a.StartsWith("-logips=")).Select(a => a.Substring("-logips=".Length).Replace("\"", "")).FirstOrDefault();
-			//var printtoconsoleArgs = args.Where(a => a.StartsWith("-printtoconsole=")).Select(a => a.Substring("-printtoconsole=".Length).Replace("\"", "")).FirstOrDefault();
 
 			ILoggerFactory loggerFactory = new LoggerFactory()
 				.WithFilter(filterSettings);
 			loggerFactory.AddDebug(LogLevel.Trace);
-			loggerFactory.AddConsole(LogLevel.Trace);
+			if (initialNodeArgs.PrintToConsole)
+			{
+				loggerFactory.AddConsole(LogLevel.Trace);
+			}
+			else
+			{
+				var fs = File.Open(Path.Combine(initialNodeArgs.DataDir, "debug.log"), FileMode.Append, FileAccess.Write);
+				var listener = new TextWriterTraceListener(fs);
+				var sourceSwitch = new SourceSwitch("Default") { Level = SourceLevels.All };
+				loggerFactory.AddTraceSource(sourceSwitch, listener);
+			}
+
+			loggerFactory.CreateLogger<Logs>().LogInformation("Logging configured");
+
 			return loggerFactory;
 		}
 

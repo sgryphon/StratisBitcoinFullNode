@@ -167,6 +167,14 @@ namespace Stratis.Bitcoin.Configuration
 		{
 			get; set;
 		}
+		public string Debug
+		{
+			get; private set;
+		}
+		public bool PrintToConsole
+		{
+			get; private set;
+		}
 		public bool RegTest
 		{
 			get;
@@ -195,18 +203,42 @@ namespace Stratis.Bitcoin.Configuration
 
 		public static NodeArgs Default()
 		{
-			return NodeArgs.GetArgs(new string[0]);
+			return NodeArgs.GetInitialArgs(new string[0]);
 		}
 
-		public static NodeArgs GetArgs(string[] args)
+		public static NodeArgs GetInitialArgs(string[] args)
 		{
+			// Load sufficient args to start logging; this means datadir, conf, network, and log settings
+			// Sequence/combinations:
+
+			// 1) Has -datadir 
+			// 1.1) No -conf
+			//      -> default conf, based on datadir
+			//      -> debug, printtoconsole from config
+			// 1.2) Relative -conf
+			//      -> load testnet, regtest from config
+			//      -> debug, printtoconsole from config
+			// 1.3) Absolute -conf
+			//      -> load testnet, regtest from config
+			//      -> debug, printtoconsole from config
+			// 2) No -datadir
+			// 2.1) No -conf
+			//      -> default datadir, based on network
+			//      -> default conf, based on datadir
+			//      -> NOTE: testnet/regnet in config is ignored (would be circular)
+			//      -> debug, printtoconsole from config
+			// 2.2) Has -conf (should be absolute)
+			//      -> load testnet, regtest from config
+			//      -> default datadir, based on network
+			//      -> debug, printtoconsole from config
+
 			NodeArgs nodeArgs = new NodeArgs();
 			nodeArgs.ConfigurationFile = args.Where(a => a.StartsWith("-conf=")).Select(a => a.Substring("-conf=".Length).Replace("\"", "")).FirstOrDefault();
 			nodeArgs.DataDir = args.Where(a => a.StartsWith("-datadir=")).Select(a => a.Substring("-datadir=".Length).Replace("\"", "")).FirstOrDefault();
-			if(nodeArgs.DataDir != null && nodeArgs.ConfigurationFile != null)
+			if (nodeArgs.DataDir != null && nodeArgs.ConfigurationFile != null)
 			{
 				var isRelativePath = Path.GetFullPath(nodeArgs.ConfigurationFile).Length > nodeArgs.ConfigurationFile.Length;
-				if(isRelativePath)
+				if (isRelativePath)
 				{
 					nodeArgs.ConfigurationFile = Path.Combine(nodeArgs.DataDir, nodeArgs.ConfigurationFile);
 				}
@@ -216,7 +248,7 @@ namespace Stratis.Bitcoin.Configuration
 
 			if (nodeArgs.ConfigurationFile != null)
 			{
-				AssetConfigFileExists(nodeArgs);
+				AssertConfigFileExists(nodeArgs);
 				var configTemp = TextFileConfiguration.Parse(File.ReadAllText(nodeArgs.ConfigurationFile));
 				nodeArgs.Testnet = configTemp.GetOrDefault<bool>("testnet", false);
 				nodeArgs.RegTest = configTemp.GetOrDefault<bool>("regtest", false);
@@ -226,18 +258,41 @@ namespace Stratis.Bitcoin.Configuration
 				throw new ConfigurationException("Invalid combination of -regtest and -testnet");
 
 			var network = nodeArgs.GetNetwork();
-			if(nodeArgs.DataDir == null)
+			if (nodeArgs.DataDir == null)
 			{
 				nodeArgs.DataDir = GetDefaultDataDir("stratisbitcoin", network);
 			}
 
-			if(nodeArgs.ConfigurationFile == null)
+			nodeArgs.Debug = args.Where(a => a.StartsWith("-debug=")).Select(a => a.Substring("-debug=".Length).Replace("\"", "")).FirstOrDefault();
+			nodeArgs.PrintToConsole = args.Contains("-printtoconsole", StringComparer.CurrentCultureIgnoreCase);
+
+			// Don't allow setting logging in config file, so we can start logging sooner.
+			// (Otherwise have to remove loggin from GetDefaultConfigurationFile() earlier, and move it before this section.)
+
+			//if (nodeArgs.ConfigurationFile != null)
+			//{
+			//	if (!File.Exists(nodeArgs.ConfigurationFile))
+			//	{
+			//		var configTemp2 = TextFileConfiguration.Parse(File.ReadAllText(nodeArgs.ConfigurationFile));
+			//		nodeArgs.Debug = configTemp2.GetOrDefault<string>("debug", nodeArgs.Debug);
+			//		nodeArgs.PrintToConsole = configTemp2.GetOrDefault<bool>("printtoconsole", nodeArgs.PrintToConsole);
+			//	}
+			//}
+
+			return nodeArgs;
+		}
+
+		public static NodeArgs GetRemainingArgs(string[] args, NodeArgs nodeArgs)
+		{
+			if (nodeArgs.ConfigurationFile == null)
 			{
 				nodeArgs.ConfigurationFile = nodeArgs.GetDefaultConfigurationFile();
 			}
 
 			Logs.Configuration.LogInformation("Data directory set to " + nodeArgs.DataDir);
 			Logs.Configuration.LogInformation("Configuration file set to " + nodeArgs.ConfigurationFile);
+
+			var network = nodeArgs.GetNetwork();
 
 			if(!Directory.Exists(nodeArgs.DataDir))
 				throw new ConfigurationException("Data directory does not exists");
@@ -375,7 +430,7 @@ namespace Stratis.Bitcoin.Configuration
 			return nodeArgs;
 		}
 
-		private static void AssetConfigFileExists(NodeArgs nodeArgs)
+		private static void AssertConfigFileExists(NodeArgs nodeArgs)
 		{
 			if(!File.Exists(nodeArgs.ConfigurationFile))
 				throw new ConfigurationException("Configuration file does not exists");
@@ -440,7 +495,8 @@ namespace Stratis.Bitcoin.Configuration
 			var home = Environment.GetEnvironmentVariable("HOME");
 			if(!string.IsNullOrEmpty(home))
 			{
-				Logs.Configuration.LogInformation("Using HOME environment variable for initializing application data");
+				// Can't log (to file) until after we know the directory (to log to)
+				//Logs.Configuration.LogInformation("Using HOME environment variable for initializing application data");
 				directory = home;
 				directory = Path.Combine(directory, "." + appName.ToLowerInvariant());
 			}
@@ -449,7 +505,7 @@ namespace Stratis.Bitcoin.Configuration
 				var localAppData = Environment.GetEnvironmentVariable("APPDATA");
 				if(!string.IsNullOrEmpty(localAppData))
 				{
-					Logs.Configuration.LogInformation("Using APPDATA environment variable for initializing application data");
+					//Logs.Configuration.LogInformation("Using APPDATA environment variable for initializing application data");
 					directory = localAppData;
 					directory = Path.Combine(directory, appName);
 				}
@@ -465,7 +521,7 @@ namespace Stratis.Bitcoin.Configuration
 			directory = Path.Combine(directory, network.Name);
 			if(!Directory.Exists(directory))
 			{
-				Logs.Configuration.LogInformation("Creating data directory");
+				//Logs.Configuration.LogInformation("Creating data directory");
 				Directory.CreateDirectory(directory);
 			}
 			return directory;
